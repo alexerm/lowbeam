@@ -25,6 +25,23 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var easeEnd: Date?
     @Published private(set) var easeProgress = 0.0
 
+    let keyboard = KeyboardLight()
+    @Published private(set) var keyboardOn = false
+
+    func refreshKeyboard() { keyboardOn = keyboard.level > 0 }
+
+    /// Off remembers the level; on brings it back (KeyLight's very low level if none was saved).
+    func setKeyboard(on: Bool) {
+        if on {
+            keyboard.set(d.object(forKey: "keyboardLevel") as? Float ?? 0.0003)
+        } else {
+            let now = keyboard.level
+            if now > 0 { d.set(now, forKey: "keyboardLevel") }
+            keyboard.set(0)
+        }
+        refreshKeyboard()
+    }
+
     private var easeTimer: Timer?
     private let loc = CLLocationManager()
 
@@ -212,6 +229,18 @@ struct Popover: View {
             CapsuleSlider(icon: "circle.lefthalf.filled", name: "Contrast", value: contrastWord, fraction: Binding(
                 get: { (m.gamma - 1) / 1.5 }, set: { m.gamma = 1 + $0 * 1.5 }))
 
+            if m.keyboard.available {
+                HStack(spacing: 10) {
+                    Image(systemName: "keyboard").foregroundColor(.amber).frame(width: 18)
+                    Text("Keyboard light")
+                    Spacer()
+                    Toggle("", isOn: Binding(get: { m.keyboardOn }, set: { m.setKeyboard(on: $0) }))
+                        .toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
+                }
+                .padding(.horizontal, 14).frame(height: 44)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.pop2))
+            }
+
             CapsuleSlider(icon: "flame", name: "Warmth", value: "\(Int(Core.kelvin(warmth: m.warmth).rounded())) K", fraction: Binding(
                 get: { m.warmth }, set: { m.stopEase(); m.warmth = $0 }))
 
@@ -365,6 +394,7 @@ final class App: NSObject, NSApplicationDelegate {
 
     @objc func toggle() {
         if popover.isShown { popover.performClose(nil); return }
+        model.refreshKeyboard()
         popover.contentSize = popover.contentViewController!.view.fittingSize
         popover.show(relativeTo: item.button!.bounds, of: item.button!, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)

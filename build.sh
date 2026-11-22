@@ -9,7 +9,7 @@ rm -rf Dimmer.app .build/arm64 .build/x86_64
 mkdir -p $A/MacOS $A/Resources .build
 cp icon/Dimmer.icns $A/Resources/
 for arch in arm64 x86_64; do
-  swiftc -O -target $arch-apple-macos13 Core.swift main.swift -o .build/Dimmer-$arch
+  swiftc -O -target $arch-apple-macos13 Core.swift Keyboard.swift main.swift -o .build/Dimmer-$arch
 done
 lipo -create .build/Dimmer-arm64 .build/Dimmer-x86_64 -output $A/MacOS/Dimmer
 cat > $A/Info.plist <<P
