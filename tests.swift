@@ -67,5 +67,10 @@ let old = [Preset(name: "Night", look: Preset.retired["Night"]!, keyboard: false
 let moved = Preset.migrate(old)
 check(moved[0].look == Preset.defaults[2].look && moved[1].look == old[1].look, "too-dark Night moves to the new default; an edited one stays")
 
+// Too-dark hint: today's presets are fine; 1.2.0's Night and the lowest slider end are not.
+check(!Core.tooDark(Preset.defaults[1].look) && !Core.tooDark(Preset.defaults[2].look), "Reading and Night are not too dark")
+check(Core.tooDark(Preset.retired["Night"]!), "old Night is too dark")
+check(Core.tooDark(Look(level: 0.05, gamma: 1, warmth: 0, blueCut: 0)), "5% brightness is too dark")
+
 print(failures == 0 ? "all checks passed" : "\(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

@@ -123,3 +123,10 @@ extension Core {
     /// The less-blue slider moves in four steps: none, −25%, −50%, −75%.
     static func blueStep(_ amount: Double) -> Double { (min(max(amount, 0), 1) * 3).rounded() * 0.25 }
 }
+
+extension Core {
+    /// Light from a mid-grey pixel (signal 0.5), as a share of full white: where body text and UI greys sit.
+    static func midGreyLight(_ l: Look) -> Double { pow(gammaMax(level: l.level) * pow(0.5, l.gamma), 2.2) }
+    /// Below this, mid greys sink into black and the controls get hard to find.
+    static func tooDark(_ l: Look) -> Bool { midGreyLight(l) < 0.015 }
+}

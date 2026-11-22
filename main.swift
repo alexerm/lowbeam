@@ -3,6 +3,7 @@ import SwiftUI
 import CoreLocation
 import ServiceManagement
 import Carbon.HIToolbox
+import Sparkle
 
 // MARK: - Model
 
@@ -93,6 +94,18 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, r, g, 0, gr, g, 0, b, g) }
     }
 
+    // MARK: Too-dark hint
+
+    private var hintTimer: Timer?
+    /// Call after every change a person makes. Once they stop, a too-dark look shows the way back.
+    func userChanged() {
+        hintTimer?.invalidate()
+        hintTimer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: false) { [weak self] _ in
+            guard let self, self.enabled, Core.tooDark(self.look) else { return }
+            DarkHint.shared.show()
+        }
+    }
+
     // MARK: Looks and presets
 
     var look: Look {
@@ -105,6 +118,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     func setColour(_ v: Double) {
         stopEase()
         if style == .warm { warmth = v; blueCut = 0 } else { blueCut = Core.blueStep(v); warmth = 0 }
+        userChanged()
     }
     func setStyle(_ s: ColourStyle) {
         let v = colour; style = s; setColour(v)
@@ -118,6 +132,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         look = p.look
         if p.look.warmth > 0.001 { style = .warm } else if p.look.blueCut > 0.001 { style = .blue }
         setKeyboard(on: p.keyboard)
+        userChanged()
     }
     func saveCurrent(as name: String) {
         let p = Preset(name: name, look: look, keyboard: keyboard.available ? keyboardOn : true)
@@ -278,6 +293,46 @@ struct Segments<T: Equatable>: View {
     }
 }
 
+/// A pure white card with black text. Gamma dims every pixel, so white is the brightest the screen can show
+/// at the current setting; this is the most visible thing Dimmer can draw.
+final class DarkHint {
+    static let shared = DarkHint()
+    private var panel: NSPanel?
+    private var hide: Timer?
+
+    func show() {
+        let p = panel ?? make()
+        panel = p
+        if let s = NSScreen.main {
+            let f = s.visibleFrame
+            p.setFrameOrigin(NSPoint(x: f.midX - p.frame.width / 2, y: f.maxY - p.frame.height - 24))
+        }
+        p.orderFrontRegardless()
+        hide?.invalidate()
+        hide = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in self?.panel?.orderOut(nil) }
+    }
+
+    private func make() -> NSPanel {
+        let view = VStack(spacing: 6) {
+            Text("Too dark to see?").font(.system(size: 22, weight: .bold))
+            Text("Press ⌃⌥⌘D to turn Dimmer off.").font(.system(size: 18, weight: .semibold))
+            Text("The same keys turn it back on.").font(.system(size: 14))
+        }
+        .foregroundColor(.black).padding(.horizontal, 28).padding(.vertical, 20)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white))
+        .onTapGesture { [weak self] in self?.panel?.orderOut(nil) }
+        let host = NSHostingView(rootView: view)
+        host.frame.size = host.fittingSize
+        let p = NSPanel(contentRect: host.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.contentView = host
+        p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
+        p.level = .popUpMenu
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        p.hidesOnDeactivate = false
+        return p
+    }
+}
+
 /// Text prompt for a preset name. Nil when cancelled or empty.
 func askName(_ title: String, _ initial: String) -> String? {
     let a = NSAlert(); a.messageText = title
@@ -330,7 +385,7 @@ struct Popover: View {
             HStack {
                 Text("Dimmer").fontWeight(.semibold)
                 Spacer()
-                Toggle("", isOn: $m.enabled).toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
+                Toggle("", isOn: Binding(get: { m.enabled }, set: { m.enabled = $0; m.userChanged() })).toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -349,10 +404,10 @@ struct Popover: View {
 
             CapsuleSlider(icon: "sun.min", name: "Brightness", value: pct(m.level), fraction: Binding(
                 get: { (m.level - 0.05) / 0.95 },
-                set: { m.stopEase(); m.level = 0.05 + $0 * 0.95 }))
+                set: { m.stopEase(); m.level = 0.05 + $0 * 0.95; m.userChanged() }))
 
             CapsuleSlider(icon: "circle.lefthalf.filled", name: "Contrast", value: contrastWord, fraction: Binding(
-                get: { (m.gamma - 1) / 1.5 }, set: { m.stopEase(); m.gamma = 1 + $0 * 1.5 }))
+                get: { (m.gamma - 1) / 1.5 }, set: { m.stopEase(); m.gamma = 1 + $0 * 1.5; m.userChanged() }))
 
             VStack(spacing: 8) {
                 Segments(options: [(ColourStyle.blue, "Less blue"), (.warm, "Warm")], selected: m.style) { m.setStyle($0) }
@@ -445,7 +500,9 @@ struct Popover: View {
                     .toggleStyle(.checkbox)
                 Spacer()
                 Text("⌃⌥⌘D off").help("Turns Dimmer off or on from any app")
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
+                Button("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")") {
+                    (NSApp.delegate as? App)?.updates.checkForUpdates(nil)
+                }.buttonStyle(.plain).help("Check for updates")
                 Button("Quit") { NSApp.terminate(nil) }.buttonStyle(.plain)
             }.font(.system(size: 12)).foregroundColor(.ink2)
         }
@@ -464,6 +521,8 @@ final class App: NSObject, NSApplicationDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     let popover = NSPopover()
     let model = Dimmer()
+    /// Sparkle reads SUFeedURL from Info.plist: the appcast attached to the latest GitHub release.
+    let updates = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     /// ⌃⌥⌘D turns Dimmer off or on from anywhere: the way back when the screen is too dark to find the menu.
     private func registerHotKey() {
@@ -490,6 +549,7 @@ final class App: NSObject, NSApplicationDelegate {
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
         popover.contentSize = host.view.fittingSize
+        if CommandLine.arguments.contains("--hint") { DarkHint.shared.show() }
         if CommandLine.arguments.contains("--show") { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.toggle() } }
     }
     // Same mark as the app icon: half-lit disc, rays that fade and shorten clockwise.

@@ -16,4 +16,10 @@ if [ -n "$SIGN_ID" ] && [ -n "$NOTARY_PROFILE" ]; then
 else
   echo "not notarized: set SIGN_ID and NOTARY_PROFILE for a build other Macs will open"
 fi
-echo "release: $Z"
+# Appcast for Sparkle: signs the zip with the "dimmer" EdDSA key in the login keychain.
+# It lists this version only, with its download on the GitHub release v$V.
+R=dist/appcast-$V
+rm -rf "$R"; mkdir -p "$R"; cp "$Z" "$R/"
+vendor/sparkle/bin/generate_appcast --account dimmer --download-url-prefix "https://github.com/alexerm/dimmer/releases/download/v$V/" "$R"
+echo "release: $Z and $R/appcast.xml"
+echo "publish: gh release create v$V \"$Z\" \"$R/appcast.xml\" --title \"Dimmer $V\""
