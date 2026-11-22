@@ -22,9 +22,6 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
     @Published var autoKind: AutoStart { didSet { d.set(autoKind.rawValue, forKey: "autoKind") } }   // sunset or time, kept while off
     @Published var startMinute: Int { didSet { d.set(startMinute, forKey: "startMinute") } } // minutes after midnight
-    /// Extra dimming per app (bundle id → share removed), against the flash from a dark app to a bright one.
-    @Published var appDim: [String: Double] { didSet { d.set(appDim, forKey: "appDim"); apply() } }
-    @Published private(set) var frontApp: NSRunningApplication?
     @Published var sunset: Date?
     @Published var sunsetIsGuess = false          // location off: sunset from the time zone
     @Published var conflict: String?              // another app that writes the gamma table
@@ -66,19 +63,15 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         auto = AutoStart(rawValue: d.string(forKey: "auto") ?? "") ?? .off
         autoKind = AutoStart(rawValue: d.string(forKey: "autoKind") ?? "") ?? .sunset
         startMinute = d.object(forKey: "startMinute") as? Int ?? 22 * 60
-        appDim = d.dictionary(forKey: "appDim") as? [String: Double] ?? [:]
         super.init()
         if saved == nil { presets = Preset.defaults; windTarget = presets.last!.id }
         if auto != .off { autoKind = auto }
         loc.delegate = self
         updateSunset()
         if auto == .sunset { locate() }
-        frontApp = NSWorkspace.shared.frontmostApplication.flatMap { $0.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : $0 }
         // Gamma resets on wake, display change and some app launches; re-apply.
         NotificationCenter.default.addObserver(self, selector: #selector(apply), name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        let ws = NSWorkspace.shared.notificationCenter
-        ws.addObserver(self, selector: #selector(apply), name: NSWorkspace.screensDidWakeNotification, object: nil)
-        ws.addObserver(self, selector: #selector(appActivated(_:)), name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(apply), name: NSWorkspace.screensDidWakeNotification, object: nil)
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.apply() }
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkAutoStart(); self?.checkConflict() }
         checkConflict()
@@ -87,22 +80,8 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         apply()
     }
 
-    /// The app in front, ignoring Dimmer itself (the popover makes Dimmer active).
-    @objc private func appActivated(_ n: Notification) {
-        guard let a = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              a.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
-        frontApp = a
-        apply()   // at once: the new app's first frame is the flash
-    }
-
-    var frontDim: Double { frontApp?.bundleIdentifier.flatMap { appDim[$0] } ?? 0 }
-    func setFrontDim(_ v: Double) {
-        guard let id = frontApp?.bundleIdentifier else { return }
-        appDim[id] = v > 0 ? v : nil
-    }
-
     @objc func apply() {
-        let lit = level * (1 - frontDim)
+        let lit = level
         if !enabled || (lit >= 0.999 && gamma <= 1.001 && warmth <= 0.001 && blueCut <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16); var n: UInt32 = 0
         CGGetOnlineDisplayList(16, &ids, &n)
@@ -390,17 +369,6 @@ struct Popover: View {
                 }
                 .padding(.horizontal, 14).frame(height: 44)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.pop2))
-            }
-
-            if let app = m.frontApp {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 16, height: 16) }
-                        Text("Extra dim in \(app.localizedName ?? "this app")").foregroundColor(.ink2)
-                    }.font(.system(size: 12))
-                    Segments(options: [(0.0, "Same"), (0.25, "−25%"), (0.5, "−50%"), (0.75, "−75%")],
-                             selected: m.frontDim) { m.setFrontDim($0) }
-                }
             }
 
             Divider().overlay(Color.line)
