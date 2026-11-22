@@ -90,6 +90,27 @@ kbd { font: 600 14px Inter, sans-serif; padding: 2px 7px; border-radius: 6px; ba
 .how dt { font-weight: 600; }
 .how dd { color: var(--ink2); }
 
+/* Layer diagram: where each control acts on the way from app to eye */
+.layers-sec .wrap { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; align-items: start; }
+.layers-sec .intro p { color: var(--ink2); margin-top: 16px; max-width: 38ch; }
+.stack { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.stack > li { position: relative; padding: 16px 20px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+.stack > li + li { margin-top: 22px; }
+.stack > li + li::before { content: ""; position: absolute; left: 50%; top: -22px; height: 22px; border-left: 1px solid #4a4038; }
+.stack > li + li::after { content: ""; position: absolute; left: calc(50% - 4px); top: -7px; border: 4px solid transparent; border-top-color: #4a4038; }
+.stack .k { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.stack b { display: block; font-weight: 600; margin-top: 2px; }
+.stack li > span:last-child, .stack .row span { color: var(--ink2); font-size: 15px; }
+.stack .skip { background: transparent; border-style: dashed; opacity: .75; }
+.stack .skip b { text-decoration: line-through; text-decoration-color: #6b5a4c; }
+.stack .ours { background: #241a12; border-color: var(--amber); }
+.stack .ours .k { color: var(--amber); }
+.stack .rows { display: grid; gap: 10px; margin-top: 12px; }
+.stack .row { display: grid; grid-template-columns: 9ch 1fr; gap: 12px; padding-top: 10px; border-top: 1px solid #3a2b1f; }
+.stack .row b { margin: 0; color: var(--amber); }
+.stack .eye { background: transparent; border: 0; text-align: center; padding: 4px; color: var(--ink2); font-size: 15px; }
+@media (max-width: 860px) { .layers-sec .wrap { grid-template-columns: 1fr; gap: 32px; } }
+
 /* Closing art: carved night road, faded into the page on every side, no frame */
 .road { padding: 0; }
 .road img {
@@ -225,6 +246,28 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <img src="feat-way-back.webp" width="1120" height="480" alt="" loading="lazy">
       </article>
     </div>
+  </div>
+</section>
+
+<section class="layers-sec" id="layers">
+  <div class="wrap">
+    <div class="intro">
+      <h2>Where the light gets turned down.</h2>
+      <p>Every pixel passes through a few layers before it reaches your eyes. Lowbeam works in the display’s colour table, after all apps have drawn and before the backlight turns the signal into light.</p>
+    </div>
+    <ol class="stack">
+      <li><span class="k">Apps</span><b>Windows draw their pixels</b><span>Browsers, editors, video. Each one draws at full brightness.</span></li>
+      <li class="skip"><span class="k">Overlay dimmers</span><b>A dark sheet laid over the screen</b><span>Lowbeam skips this layer. A sheet turns black into grey and catches stray clicks.</span></li>
+      <li class="ours"><span class="k">Lowbeam · display colour table</span><b>One curve per colour channel</b>
+        <div class="rows">
+          <div class="row"><b>Contrast</b><span>Bends the curve so dark greys stay apart and text stays readable.</span></div>
+          <div class="row"><b>Colour</b><span>Cuts the blue channel in steps, or warms all three toward candlelight.</span></div>
+          <div class="row"><b>Brightness</b><span>Lowers the top of the curve. Below the lowest backlight level, this is the only way down.</span></div>
+        </div>
+      </li>
+      <li><span class="k">Display brightness</span><b>The backlight</b><span>Your brightness keys and auto-brightness set it. Lowbeam leaves it alone, so the two add up.</span></li>
+      <li class="eye">Your eyes. The keyboard light sits beside the screen, and Lowbeam switches it too.</li>
+    </ol>
   </div>
 </section>
 
