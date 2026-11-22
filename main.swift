@@ -13,6 +13,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var level: Double { didSet { d.set(level, forKey: "level"); apply() } }      // share of light, 0.05...1
     @Published var gamma: Double { didSet { d.set(gamma, forKey: "gamma"); apply() } }      // 1...2.5
     @Published var warmth: Double { didSet { d.set(warmth, forKey: "warmth"); apply() } }   // 0 neutral ... 1 = 2700 K
+    @Published var blueCut: Double { didSet { d.set(blueCut, forKey: "blueCut"); apply() } }   // 0, 0.25, 0.5, 0.75: share of blue removed
     @Published var warmthTarget: Double { didSet { d.set(warmthTarget, forKey: "warmthTarget") } }
     @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider
     @Published var minutes: Int { didSet { d.set(minutes, forKey: "minutes") } }
@@ -32,6 +33,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         level = d.object(forKey: "level") as? Double ?? 1
         gamma = d.object(forKey: "gamma") as? Double ?? 1
         warmth = d.object(forKey: "warmth") as? Double ?? 0
+        blueCut = d.object(forKey: "blueCut") as? Double ?? 0
         warmthTarget = d.object(forKey: "warmthTarget") as? Double ?? 0.6
         floor = d.object(forKey: "floor") as? Double ?? 0.05
         minutes = d.object(forKey: "minutes") as? Int ?? 30
@@ -53,13 +55,13 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     @objc func apply() {
-        if !enabled || (level >= 0.999 && gamma <= 1.001 && warmth <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
+        if !enabled || (level >= 0.999 && gamma <= 1.001 && warmth <= 0.001 && blueCut <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16); var n: UInt32 = 0
         CGGetOnlineDisplayList(16, &ids, &n)
         // Exponent > 1 dims darks faster than brights.
         let m = CGGammaValue(Core.gammaMax(level: level)), g = CGGammaValue(gamma)
         let c = Core.channelGains(kelvin: Core.kelvin(warmth: warmth))
-        let r = m * CGGammaValue(c.r), gr = m * CGGammaValue(c.g), b = m * CGGammaValue(c.b)
+        let r = m * CGGammaValue(c.r), gr = m * CGGammaValue(c.g), b = m * CGGammaValue(c.b * (1 - blueCut))
         for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, r, g, 0, gr, g, 0, b, g) }
     }
 
@@ -212,6 +214,21 @@ struct Popover: View {
 
             CapsuleSlider(icon: "flame", name: "Warmth", value: "\(Int(Core.kelvin(warmth: m.warmth).rounded())) K", fraction: Binding(
                 get: { m.warmth }, set: { m.stopEase(); m.warmth = $0 }))
+
+            HStack(spacing: 6) {
+                Text("Blue light").font(.system(size: 12)).foregroundColor(.ink2).frame(width: 64, alignment: .leading)
+                ForEach([(0.0, "Full"), (0.25, "−25%"), (0.5, "−50%"), (0.75, "−75%")], id: \.0) { cut, label in
+                    let on = abs(m.blueCut - cut) < 0.01
+                    Button { m.blueCut = cut } label: {
+                        Text(label).font(.system(size: 12, weight: on ? .semibold : .regular))
+                            .foregroundColor(on ? .ink : .ink2)
+                            .frame(maxWidth: .infinity, minHeight: 28)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.amberDim : Color.pop2))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Color.amber : .clear))
+                            .contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                }
+            }
 
             Divider().overlay(Color.line)
 
