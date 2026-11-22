@@ -55,5 +55,13 @@ check(near(neutral.r, 1, 1e-6) && near(neutral.g, 1, 1e-6) && near(neutral.b, 1,
 let warm = Core.channelGains(kelvin: Core.kelvin(warmth: 1))
 check(near(warm.r, 1, 1e-6) && warm.b < warm.g && warm.g < 1 && warm.b > 0.3, "full warmth: blue < green < red, blue not black")
 
+// Presets and the colour slider.
+let day = Preset.defaults[0].look, night = Preset.defaults[2].look
+check(Look.mix(day, night, 0) == day && Look.mix(day, night, 1).near(night), "mix starts at one look and ends at the other")
+check(near(Look.mix(day, night, 0.5).level, (day.level * night.level).squareRoot(), 1e-9), "mix moves light in log space")
+check(Core.blueStep(0) == 0 && Core.blueStep(0.5) == 0.5 && Core.blueStep(1) == 0.75 && Core.blueStep(0.2) == 0.25, "blue slider snaps to 4 steps")
+let data = try! JSONEncoder().encode(Preset.defaults)
+check(try! JSONDecoder().decode([Preset].self, from: data) == Preset.defaults, "presets round-trip through storage")
+
 print(failures == 0 ? "all checks passed" : "\(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

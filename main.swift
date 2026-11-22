@@ -6,6 +6,7 @@ import ServiceManagement
 // MARK: - Model
 
 enum AutoStart: String { case off, sunset, time }
+enum ColourStyle: String { case warm, blue }
 
 final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let d = UserDefaults.standard
@@ -13,12 +14,17 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var level: Double { didSet { d.set(level, forKey: "level"); apply() } }      // share of light, 0.05...1
     @Published var gamma: Double { didSet { d.set(gamma, forKey: "gamma"); apply() } }      // 1...2.5
     @Published var warmth: Double { didSet { d.set(warmth, forKey: "warmth"); apply() } }   // 0 neutral ... 1 = 2700 K
-    @Published var blueCut: Double { didSet { d.set(blueCut, forKey: "blueCut"); apply() } }   // 0, 0.25, 0.5, 0.75: share of blue removed
-    @Published var warmthTarget: Double { didSet { d.set(warmthTarget, forKey: "warmthTarget") } }
-    @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider
+    @Published var blueCut: Double { didSet { d.set(blueCut, forKey: "blueCut"); apply() } }   // share of blue removed
+    @Published var style: ColourStyle { didSet { d.set(style.rawValue, forKey: "style") } }
+    @Published var presets: [Preset] { didSet { d.set(try? JSONEncoder().encode(presets), forKey: "presets") } }
+    @Published var windTarget: String { didSet { d.set(windTarget, forKey: "windTarget") } }   // preset id
     @Published var minutes: Int { didSet { d.set(minutes, forKey: "minutes") } }
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
+    @Published var autoKind: AutoStart { didSet { d.set(autoKind.rawValue, forKey: "autoKind") } }   // sunset or time, kept while off
     @Published var startMinute: Int { didSet { d.set(startMinute, forKey: "startMinute") } } // minutes after midnight
+    /// Extra dimming per app (bundle id → share removed), against the flash from a dark app to a bright one.
+    @Published var appDim: [String: Double] { didSet { d.set(appDim, forKey: "appDim"); apply() } }
+    @Published private(set) var frontApp: NSRunningApplication?
     @Published var sunset: Date?
     @Published var sunsetIsGuess = false          // location off: sunset from the time zone
     @Published var conflict: String?              // another app that writes the gamma table
@@ -32,8 +38,9 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// Off remembers the level; on brings it back (KeyLight's very low level if none was saved).
     func setKeyboard(on: Bool) {
+        guard keyboard.available else { return }
         if on {
-            keyboard.set(d.object(forKey: "keyboardLevel") as? Float ?? 0.0003)
+            if keyboard.level == 0 { keyboard.set(d.object(forKey: "keyboardLevel") as? Float ?? 0.0003) }
         } else {
             let now = keyboard.level
             if now > 0 { d.set(now, forKey: "keyboardLevel") }
@@ -51,18 +58,27 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         gamma = d.object(forKey: "gamma") as? Double ?? 1
         warmth = d.object(forKey: "warmth") as? Double ?? 0
         blueCut = d.object(forKey: "blueCut") as? Double ?? 0
-        warmthTarget = d.object(forKey: "warmthTarget") as? Double ?? 0.6
-        floor = d.object(forKey: "floor") as? Double ?? 0.05
+        style = ColourStyle(rawValue: d.string(forKey: "style") ?? "") ?? .blue
+        let saved = (d.data(forKey: "presets")).flatMap { try? JSONDecoder().decode([Preset].self, from: $0) }
+        presets = saved ?? Preset.defaults
+        windTarget = d.string(forKey: "windTarget") ?? (saved ?? Preset.defaults).last!.id
         minutes = d.object(forKey: "minutes") as? Int ?? 30
         auto = AutoStart(rawValue: d.string(forKey: "auto") ?? "") ?? .off
+        autoKind = AutoStart(rawValue: d.string(forKey: "autoKind") ?? "") ?? .sunset
         startMinute = d.object(forKey: "startMinute") as? Int ?? 22 * 60
+        appDim = d.dictionary(forKey: "appDim") as? [String: Double] ?? [:]
         super.init()
+        if saved == nil { presets = Preset.defaults; windTarget = presets.last!.id }
+        if auto != .off { autoKind = auto }
         loc.delegate = self
         updateSunset()
         if auto == .sunset { locate() }
+        frontApp = NSWorkspace.shared.frontmostApplication.flatMap { $0.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : $0 }
         // Gamma resets on wake, display change and some app launches; re-apply.
         NotificationCenter.default.addObserver(self, selector: #selector(apply), name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(apply), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        let ws = NSWorkspace.shared.notificationCenter
+        ws.addObserver(self, selector: #selector(apply), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        ws.addObserver(self, selector: #selector(appActivated(_:)), name: NSWorkspace.didActivateApplicationNotification, object: nil)
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.apply() }
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkAutoStart(); self?.checkConflict() }
         checkConflict()
@@ -71,15 +87,75 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         apply()
     }
 
+    /// The app in front, ignoring Dimmer itself (the popover makes Dimmer active).
+    @objc private func appActivated(_ n: Notification) {
+        guard let a = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              a.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+        frontApp = a
+        apply()   // at once: the new app's first frame is the flash
+    }
+
+    var frontDim: Double { frontApp?.bundleIdentifier.flatMap { appDim[$0] } ?? 0 }
+    func setFrontDim(_ v: Double) {
+        guard let id = frontApp?.bundleIdentifier else { return }
+        appDim[id] = v > 0 ? v : nil
+    }
+
     @objc func apply() {
-        if !enabled || (level >= 0.999 && gamma <= 1.001 && warmth <= 0.001 && blueCut <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
+        let lit = level * (1 - frontDim)
+        if !enabled || (lit >= 0.999 && gamma <= 1.001 && warmth <= 0.001 && blueCut <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16); var n: UInt32 = 0
         CGGetOnlineDisplayList(16, &ids, &n)
         // Exponent > 1 dims darks faster than brights.
-        let m = CGGammaValue(Core.gammaMax(level: level)), g = CGGammaValue(gamma)
+        let m = CGGammaValue(Core.gammaMax(level: lit)), g = CGGammaValue(gamma)
         let c = Core.channelGains(kelvin: Core.kelvin(warmth: warmth))
         let r = m * CGGammaValue(c.r), gr = m * CGGammaValue(c.g), b = m * CGGammaValue(c.b * (1 - blueCut))
         for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, r, g, 0, gr, g, 0, b, g) }
+    }
+
+    // MARK: Looks and presets
+
+    var look: Look {
+        get { Look(level: level, gamma: gamma, warmth: warmth, blueCut: blueCut) }
+        set { level = newValue.level; gamma = newValue.gamma; warmth = newValue.warmth; blueCut = newValue.blueCut }
+    }
+
+    /// The colour slider: one amount, read as warmth or as blue cut by the style.
+    var colour: Double { style == .warm ? warmth : blueCut / 0.75 }
+    func setColour(_ v: Double) {
+        stopEase()
+        if style == .warm { warmth = v; blueCut = 0 } else { blueCut = Core.blueStep(v); warmth = 0 }
+    }
+    func setStyle(_ s: ColourStyle) {
+        let v = colour; style = s; setColour(v)
+    }
+
+    var currentPreset: Preset? { presets.first { $0.look.near(look) } }
+    var windPreset: Preset { presets.first { $0.id == windTarget } ?? presets.last ?? Preset.defaults[2] }
+
+    func use(_ p: Preset) {
+        stopEase(); enabled = true
+        look = p.look
+        if p.look.warmth > 0.001 { style = .warm } else if p.look.blueCut > 0.001 { style = .blue }
+        setKeyboard(on: p.keyboard)
+    }
+    func saveCurrent(as name: String) {
+        let p = Preset(name: name, look: look, keyboard: keyboard.available ? keyboardOn : true)
+        presets.append(p)
+    }
+    func update(_ p: Preset) {
+        guard let i = presets.firstIndex(of: p) else { return }
+        presets[i].look = look
+        if keyboard.available { presets[i].keyboard = keyboardOn }
+    }
+    func rename(_ p: Preset, to name: String) {
+        guard let i = presets.firstIndex(of: p) else { return }
+        presets[i].name = name
+    }
+    func delete(_ p: Preset) {
+        guard presets.count > 1 else { return }
+        presets.removeAll { $0.id == p.id }
+        if windTarget == p.id { windTarget = presets.last!.id }
     }
 
     // MARK: Wind down
@@ -88,25 +164,30 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func startEase() {
         stopEase()
-        let start = level, end = min(floor, level), total = Double(minutes * 60)
-        let w0 = warmth, w1 = max(warmthTarget, warmth)
-        guard start > end + 0.001 || w1 > w0 + 0.001 else { return }
+        let target = windPreset, from = look, total = Double(minutes * 60)
+        guard !from.near(target.look) else { setKeyboard(on: target.keyboard); return }
         enabled = true
+        if target.look.warmth > 0.001 { style = .warm } else if target.look.blueCut > 0.001 { style = .blue }
         let began = Date()
         easeEnd = began.addingTimeInterval(total)
         easeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             let p = min(Date().timeIntervalSince(began) / total, 1)
             self.easeProgress = p
-            self.level = Core.easeLevel(start: start, end: end, progress: p)
-            self.warmth = w0 + (w1 - w0) * p
-            if p >= 1 { self.stopEase() }
+            self.look = Look.mix(from, target.look, p)
+            if p >= 1 { self.stopEase(); self.setKeyboard(on: target.keyboard) }
         }
     }
 
     func stopEase() { easeTimer?.invalidate(); easeTimer = nil; easeEnd = nil; easeProgress = 0 }
 
     // MARK: Auto start
+
+    var autoOn: Bool {
+        get { auto != .off }
+        set { auto = newValue ? autoKind : .off }
+    }
+    func setAutoKind(_ k: AutoStart) { autoKind = k; auto = k }
 
     var nextStart: Date? {
         let cal = Calendar.current
@@ -162,7 +243,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
 // MARK: - Look
 
 extension Color {
-    static let pop = Color(hex: 0x1C1C1F), pop2 = Color(hex: 0x26262A), line = Color(hex: 0x34343A)
+    static let pop = Color(hex: 0x1C1C1F), pop2 = Color(hex: 0x26262A), pop3 = Color(hex: 0x222225), line = Color(hex: 0x34343A)
     static let ink = Color(hex: 0xECE9E4), ink2 = Color(hex: 0xA19D97)
     static let amber = Color(hex: 0xF2A54A), amberDim = Color(hex: 0x5A4127)
     init(hex: UInt32) { self.init(red: Double(hex >> 16 & 255) / 255, green: Double(hex >> 8 & 255) / 255, blue: Double(hex & 255) / 255) }
@@ -194,9 +275,43 @@ struct CapsuleSlider: View {
     }
 }
 
+/// A row of equal buttons, one selected.
+struct Segments<T: Equatable>: View {
+    let options: [(T, String)]
+    let selected: T
+    var height: CGFloat = 28
+    let pick: (T) -> Void
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(options.indices, id: \.self) { i in
+                let (v, label) = options[i], on = v == selected
+                Button { pick(v) } label: {
+                    Text(label).font(.system(size: 12, weight: on ? .semibold : .regular))
+                        .foregroundColor(on ? .ink : .ink2)
+                        .frame(maxWidth: .infinity, minHeight: height)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.amberDim : Color.pop2))
+                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Color.amber : .clear))
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// Text prompt for a preset name. Nil when cancelled or empty.
+func askName(_ title: String, _ initial: String) -> String? {
+    let a = NSAlert(); a.messageText = title
+    a.addButton(withTitle: "Save"); a.addButton(withTitle: "Cancel")
+    let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24)); f.stringValue = initial
+    a.accessoryView = f; a.window.initialFirstResponder = f
+    NSApp.activate(ignoringOtherApps: true)
+    guard a.runModal() == .alertFirstButtonReturn else { return nil }
+    let s = f.stringValue.trimmingCharacters(in: .whitespaces)
+    return s.isEmpty ? nil : s
+}
+
 struct Popover: View {
     @ObservedObject var m: Dimmer
-    @State private var pickTime = false
 
     private func pct(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
     private func clock(_ d: Date?) -> String {
@@ -206,20 +321,50 @@ struct Popover: View {
     private var contrastWord: String {
         switch m.gamma { case ..<1.05: return "Normal"; case ..<1.5: return "Soft"; case ..<2: return "Crisp"; default: return "Strong" }
     }
-    private var autoLabel: String {
-        switch m.auto {
-        case .off: return "Off"
-        case .sunset: return "At sunset · \(m.sunsetIsGuess ? "about " : "")\(clock(m.sunset))"
-        case .time: return "At \(clock(m.nextStart))"
+    private var colourValue: String {
+        if m.style == .warm { return "\(Int(Core.kelvin(warmth: m.warmth).rounded())) K" }
+        return m.blueCut < 0.01 ? "Full blue" : "−\(Int((m.blueCut * 100).rounded()))% blue"
+    }
+
+    private func chip(_ p: Preset) -> some View {
+        let on = m.currentPreset?.id == p.id
+        return Button { m.use(p) } label: {
+            Text(p.name).font(.system(size: 12, weight: on ? .semibold : .regular))
+                .foregroundColor(on ? .ink : .ink2)
+                .padding(.horizontal, 12).frame(height: 28)
+                .background(Capsule().fill(on ? Color.amberDim : Color.pop2))
+                .overlay(Capsule().strokeBorder(on ? Color.amber : .clear))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Update to current") { m.update(p) }
+            Button("Rename…") { if let n = askName("Rename preset", p.name) { m.rename(p, to: n) } }
+            Divider()
+            Button("Delete") { m.delete(p) }.disabled(m.presets.count < 2)
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Dimmer").fontWeight(.semibold)
                 Spacer()
                 Toggle("", isOn: $m.enabled).toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(m.presets) { chip($0) }
+                    Button {
+                        if let n = askName("Save preset", "Preset \(m.presets.count + 1)") { m.saveCurrent(as: n) }
+                    } label: {
+                        Label("Save", systemImage: "plus").font(.system(size: 12)).foregroundColor(.ink2)
+                            .padding(.horizontal, 12).frame(height: 28)
+                            .overlay(Capsule().strokeBorder(Color.line, style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                            .contentShape(Capsule())
+                    }.buttonStyle(.plain).help("Save the current look as a preset. Right-click a preset to update, rename or delete it.")
+                }
             }
 
             CapsuleSlider(icon: "sun.min", name: "Brightness", value: pct(m.level), fraction: Binding(
@@ -227,7 +372,13 @@ struct Popover: View {
                 set: { m.stopEase(); m.level = 0.05 + $0 * 0.95 }))
 
             CapsuleSlider(icon: "circle.lefthalf.filled", name: "Contrast", value: contrastWord, fraction: Binding(
-                get: { (m.gamma - 1) / 1.5 }, set: { m.gamma = 1 + $0 * 1.5 }))
+                get: { (m.gamma - 1) / 1.5 }, set: { m.stopEase(); m.gamma = 1 + $0 * 1.5 }))
+
+            VStack(spacing: 8) {
+                Segments(options: [(ColourStyle.blue, "Less blue"), (.warm, "Warm")], selected: m.style) { m.setStyle($0) }
+                CapsuleSlider(icon: m.style == .warm ? "flame" : "drop", name: "Colour", value: colourValue, fraction: Binding(
+                    get: { m.colour }, set: { m.setColour($0) }))
+            }
 
             if m.keyboard.available {
                 HStack(spacing: 10) {
@@ -241,70 +392,32 @@ struct Popover: View {
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.pop2))
             }
 
-            CapsuleSlider(icon: "flame", name: "Warmth", value: "\(Int(Core.kelvin(warmth: m.warmth).rounded())) K", fraction: Binding(
-                get: { m.warmth }, set: { m.stopEase(); m.warmth = $0 }))
-
-            HStack(spacing: 6) {
-                Text("Blue light").font(.system(size: 12)).foregroundColor(.ink2).frame(width: 64, alignment: .leading)
-                ForEach([(0.0, "Full"), (0.25, "−25%"), (0.5, "−50%"), (0.75, "−75%")], id: \.0) { cut, label in
-                    let on = abs(m.blueCut - cut) < 0.01
-                    Button { m.blueCut = cut } label: {
-                        Text(label).font(.system(size: 12, weight: on ? .semibold : .regular))
-                            .foregroundColor(on ? .ink : .ink2)
-                            .frame(maxWidth: .infinity, minHeight: 28)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.amberDim : Color.pop2))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Color.amber : .clear))
-                            .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+            if let app = m.frontApp {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 16, height: 16) }
+                        Text("Extra dim in \(app.localizedName ?? "this app")").foregroundColor(.ink2)
+                    }.font(.system(size: 12))
+                    Segments(options: [(0.0, "Same"), (0.25, "−25%"), (0.5, "−50%"), (0.75, "−75%")],
+                             selected: m.frontDim) { m.setFrontDim($0) }
                 }
             }
 
             Divider().overlay(Color.line)
 
             VStack(alignment: .leading, spacing: 10) {
-                CapsuleSlider(icon: "moon", name: "Wind down to", value: pct(m.floor), fraction: Binding(
-                    get: { (m.floor - 0.05) / 0.95 },
-                    set: { m.floor = 0.05 + $0 * 0.95 }))
-                CapsuleSlider(icon: "flame", name: "Warm up to", value: "\(Int(Core.kelvin(warmth: m.warmthTarget).rounded())) K", fraction: Binding(
-                    get: { m.warmthTarget }, set: { m.warmthTarget = $0 }))
-                HStack(spacing: 6) {
-                    ForEach([(10, "10 min"), (30, "30 min"), (60, "1 hour")], id: \.0) { mins, label in
-                        let on = m.minutes == mins
-                        Button { m.minutes = mins; m.startEase() } label: {
-                            Text(label).font(.system(size: 12, weight: on ? .semibold : .regular))
-                                .foregroundColor(on ? .ink : .ink2)
-                                .frame(maxWidth: .infinity, minHeight: 32)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.amberDim : Color.pop2))
-                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Color.amber : .clear))
-                                .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                    }
-                }
                 HStack {
-                    Text("Start on its own").foregroundColor(.ink2)
+                    Image(systemName: "moon").foregroundColor(.amber).frame(width: 18)
+                    Text("Wind down to")
                     Spacer()
                     Menu {
-                        Button("Off") { m.auto = .off }
-                        Button("At sunset") { m.auto = .sunset }
-                        Button("At a set time…") { m.auto = .time; pickTime = true }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if m.auto == .sunset { Image(systemName: "sunset").foregroundColor(.amber) }
-                            Text(autoLabel).fontWeight(.medium).foregroundColor(.ink)
-                        }
-                    }.menuStyle(.borderlessButton).fixedSize()
+                        ForEach(m.presets) { p in Button(p.name) { m.windTarget = p.id } }
+                    } label: { Text(m.windPreset.name).fontWeight(.semibold).foregroundColor(.ink) }
+                        .menuStyle(.borderlessButton).fixedSize()
                 }
-                .font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.pop2))
-
-                if pickTime || m.auto == .time {
-                    DatePicker("Start at", selection: Binding(
-                        get: { Calendar.current.date(bySettingHour: m.startMinute / 60, minute: m.startMinute % 60, second: 0, of: Date())! },
-                        set: { let c = Calendar.current.dateComponents([.hour, .minute], from: $0); m.startMinute = c.hour! * 60 + c.minute! }),
-                        displayedComponents: .hourAndMinute)
-                        .font(.system(size: 12)).foregroundColor(.ink2)
+                Segments(options: [(10, "10 min"), (30, "30 min"), (60, "1 hour")], selected: m.minutes, height: 32) {
+                    m.minutes = $0; m.startEase()
                 }
-
                 if m.easing {
                     VStack(spacing: 6) {
                         GeometryReader { g in
@@ -314,12 +427,41 @@ struct Popover: View {
                             }
                         }.frame(height: 4)
                         HStack {
-                            Text("Reaches \(pct(m.floor)) at \(clock(m.easeEnd))").foregroundColor(.ink2)
+                            Text("Reaches \(m.windPreset.name) at \(clock(m.easeEnd))").foregroundColor(.ink2)
                             Spacer()
                             Button("Stop") { m.stopEase() }.buttonStyle(.plain).foregroundColor(.amber)
                         }.font(.system(size: 12))
                     }
                 }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Start on its own")
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { m.autoOn }, set: { m.autoOn = $0 }))
+                            .toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
+                    }
+                    if m.autoOn {
+                        Segments(options: [(AutoStart.sunset, "At sunset"), (.time, "At a set time")], selected: m.auto) { m.setAutoKind($0) }
+                        HStack {
+                            if m.auto == .sunset {
+                                Image(systemName: "sunset").foregroundColor(.amber)
+                                Text("Today \(m.sunsetIsGuess ? "about " : "")\(clock(m.sunset))").foregroundColor(.ink2)
+                            } else {
+                                Text("Starts at").foregroundColor(.ink2)
+                                Spacer()
+                                DatePicker("", selection: Binding(
+                                    get: { Calendar.current.date(bySettingHour: m.startMinute / 60, minute: m.startMinute % 60, second: 0, of: Date())! },
+                                    set: { let c = Calendar.current.dateComponents([.hour, .minute], from: $0); m.startMinute = c.hour! * 60 + c.minute! }),
+                                    displayedComponents: .hourAndMinute).labelsHidden().fixedSize()
+                            }
+                            Spacer()
+                        }.font(.system(size: 12)).frame(minHeight: 22)
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.pop3))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.line))
             }
 
             if let other = m.conflict {

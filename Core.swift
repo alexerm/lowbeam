@@ -76,3 +76,38 @@ extension Core {
         return (min(c.0 / n.0, 1), min(c.1 / n.1, 1), min(c.2 / n.2, 1))
     }
 }
+
+/// What the screen shows: the values a preset stores and a wind-down moves between.
+struct Look: Codable, Equatable {
+    var level: Double, gamma: Double, warmth: Double, blueCut: Double
+
+    /// Wind-down point at progress p: light in log space, the rest linear.
+    static func mix(_ a: Look, _ b: Look, _ p: Double) -> Look {
+        let p = min(max(p, 0), 1)
+        func lin(_ x: Double, _ y: Double) -> Double { x + (y - x) * p }
+        return Look(level: Core.easeLevel(start: a.level, end: b.level, progress: p),
+                    gamma: lin(a.gamma, b.gamma), warmth: lin(a.warmth, b.warmth), blueCut: lin(a.blueCut, b.blueCut))
+    }
+
+    func near(_ o: Look) -> Bool {
+        abs(level - o.level) < 0.02 && abs(gamma - o.gamma) < 0.05 && abs(warmth - o.warmth) < 0.03 && abs(blueCut - o.blueCut) < 0.02
+    }
+}
+
+struct Preset: Codable, Identifiable, Equatable {
+    var id = UUID().uuidString
+    var name: String
+    var look: Look
+    var keyboard: Bool
+
+    static let defaults = [
+        Preset(name: "Day", look: Look(level: 1, gamma: 1, warmth: 0, blueCut: 0), keyboard: true),
+        Preset(name: "Reading", look: Look(level: 0.45, gamma: 1.3, warmth: 0, blueCut: 0.5), keyboard: true),
+        Preset(name: "Night", look: Look(level: 0.12, gamma: 1.8, warmth: 0, blueCut: 0.75), keyboard: false),
+    ]
+}
+
+extension Core {
+    /// The less-blue slider moves in four steps: none, −25%, −50%, −75%.
+    static func blueStep(_ amount: Double) -> Double { (min(max(amount, 0), 1) * 3).rounded() * 0.25 }
+}
