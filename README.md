@@ -25,10 +25,7 @@ Another app that writes the colour table (f.lux, Lunar, BetterDisplay, Iris and 
 ```sh
 ./test.sh            # logic tests: gamma, easing, sunset, presets, too-dark rule
 ./build.sh           # universal Lowbeam.app, installed to ~/Applications
-SIGN_ID="Developer ID Application: …" NOTARY_PROFILE=… ./release.sh
 ```
-
-`release.sh` tests, builds, signs, notarizes and staples, then writes `dist/appcast-<version>/appcast.xml` signed with the Sparkle key stored in the login keychain under the account `dimmer`. It prints the `gh release create` command that publishes the zip and the appcast. Installed copies read the appcast from the latest GitHub release.
 
 The keyboard switch uses Apple's private `CoreBrightness` framework, so Lowbeam ships outside the Mac App Store.
 
