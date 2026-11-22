@@ -1,3 +1,5 @@
 Dimmer.app/
 icon/Dimmer.iconset/
 .DS_Store
+.build/
+dist/

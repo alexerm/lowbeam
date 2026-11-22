@@ -17,6 +17,8 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
     @Published var startMinute: Int { didSet { d.set(startMinute, forKey: "startMinute") } } // minutes after midnight
     @Published var sunset: Date?
+    @Published var sunsetIsGuess = false          // location off: sunset from the time zone
+    @Published var conflict: String?              // another app that writes the gamma table
     @Published private(set) var easeEnd: Date?
     @Published private(set) var easeProgress = 0.0
 
@@ -33,15 +35,16 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         startMinute = d.object(forKey: "startMinute") as? Int ?? 22 * 60
         super.init()
         loc.delegate = self
-        if let lat = d.object(forKey: "lat") as? Double, let lon = d.object(forKey: "lon") as? Double {
-            sunset = Self.sunset(lat: lat, lon: lon, on: Date())
-        }
+        updateSunset()
         if auto == .sunset { locate() }
         // Gamma resets on wake, display change and some app launches; re-apply.
         NotificationCenter.default.addObserver(self, selector: #selector(apply), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(apply), name: NSWorkspace.screensDidWakeNotification, object: nil)
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.apply() }
-        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkAutoStart() }
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkAutoStart(); self?.checkConflict() }
+        checkConflict()
+        // Open at login is on by default; one path only (SMAppService), so the checkbox tells the truth.
+        if d.object(forKey: "loginSet") == nil { d.set(true, forKey: "loginSet"); try? SMAppService.mainApp.register() }
         apply()
     }
 
@@ -49,8 +52,8 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         if !enabled || (level >= 0.999 && gamma <= 1.001) { CGDisplayRestoreColorSyncSettings(); return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16); var n: UInt32 = 0
         CGGetOnlineDisplayList(16, &ids, &n)
-        // Scale light, not the encoded signal (encoded^2.2 = light); exponent > 1 dims darks faster.
-        let m = CGGammaValue(pow(level, 1 / 2.2)), g = CGGammaValue(gamma)
+        // Exponent > 1 dims darks faster than brights.
+        let m = CGGammaValue(Core.gammaMax(level: level)), g = CGGammaValue(gamma)
         for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, m, g, 0, m, g, 0, m, g) }
     }
 
@@ -65,12 +68,11 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         enabled = true
         let began = Date()
         easeEnd = began.addingTimeInterval(total)
-        // Steps in log space: each step is the same perceived change.
         easeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             let p = min(Date().timeIntervalSince(began) / total, 1)
             self.easeProgress = p
-            self.level = start * pow(end / start, p)
+            self.level = Core.easeLevel(start: start, end: end, progress: p)
             if p >= 1 { self.stopEase() }
         }
     }
@@ -89,17 +91,24 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     private func checkAutoStart() {
-        if auto == .sunset, let lat = d.object(forKey: "lat") as? Double, let lon = d.object(forKey: "lon") as? Double {
-            sunset = Self.sunset(lat: lat, lon: lon, on: Date())
-        }
+        if auto == .sunset { updateSunset() }
         guard let t = nextStart, !easing else { return }
-        let today = Calendar.current.startOfDay(for: Date())
-        let last = d.object(forKey: "lastAuto") as? Date ?? .distantPast
-        // Fire once per day, within 10 minutes after the start time (covers sleep and a late launch).
-        let now = Date()
-        if last < today, now >= t, now.timeIntervalSince(t) < 600 {
-            d.set(now, forKey: "lastAuto")
+        if Core.autoStartDue(now: Date(), start: t, lastRun: d.object(forKey: "lastAuto") as? Date) {
+            d.set(Date(), forKey: "lastAuto")
             startEase()
+        }
+    }
+
+    private func checkConflict() {
+        conflict = Core.conflictingApp(runningBundleIDs: NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+    }
+
+    private func updateSunset() {
+        if let lat = d.object(forKey: "lat") as? Double, let lon = d.object(forKey: "lon") as? Double {
+            sunset = Core.sunset(lat: lat, lon: lon, on: Date()); sunsetIsGuess = false
+        } else {
+            let g = Core.approximateLocation()
+            sunset = Core.sunset(lat: g.lat, lon: g.lon, on: Date()); sunsetIsGuess = true
         }
     }
 
@@ -111,26 +120,9 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManager(_ m: CLLocationManager, didUpdateLocations l: [CLLocation]) {
         guard let c = l.last?.coordinate else { return }
         d.set(c.latitude, forKey: "lat"); d.set(c.longitude, forKey: "lon")
-        sunset = Self.sunset(lat: c.latitude, lon: c.longitude, on: Date())
+        updateSunset()
     }
     func locationManager(_ m: CLLocationManager, didFailWithError e: Error) {}
-
-    // NOAA sunset approximation, accurate to a minute or two.
-    static func sunset(lat: Double, lon: Double, on date: Date) -> Date? {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
-        let n = Double(Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1)
-        let rad = Double.pi / 180
-        let gm = 2 * Double.pi / 365 * (n - 1)
-        let eq = 229.18 * (0.000075 + 0.001868 * cos(gm) - 0.032077 * sin(gm) - 0.014615 * cos(2 * gm) - 0.040849 * sin(2 * gm))
-        let decl = 0.006918 - 0.399912 * cos(gm) + 0.070257 * sin(gm) - 0.006758 * cos(2 * gm) + 0.000907 * sin(2 * gm) - 0.002697 * cos(3 * gm) + 0.00148 * sin(3 * gm)
-        let cosH = cos(90.833 * rad) / (cos(lat * rad) * cos(decl)) - tan(lat * rad) * tan(decl)
-        guard abs(cosH) <= 1 else { return nil }
-        let ha = acos(cosH) / rad
-        let utcMin = 720 - 4 * (lon - ha) - eq
-        let local = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        guard let midnightUTC = cal.date(from: local) else { return nil }
-        return midnightUTC.addingTimeInterval(utcMin * 60)
-    }
 
     // MARK: Login item
 
@@ -190,7 +182,7 @@ struct Popover: View {
     private var autoLabel: String {
         switch m.auto {
         case .off: return "Off"
-        case .sunset: return m.sunset == nil ? "At sunset · finding you" : "At sunset · \(clock(m.sunset))"
+        case .sunset: return "At sunset · \(m.sunsetIsGuess ? "about " : "")\(clock(m.sunset))"
         case .time: return "At \(clock(m.nextStart))"
         }
     }
@@ -271,12 +263,18 @@ struct Popover: View {
                 }
             }
 
+            if let other = m.conflict {
+                Text("\(other) also changes screen colors, so the two reset each other. Quit \(other) while Dimmer is on.")
+                    .font(.system(size: 12)).foregroundColor(.amber).fixedSize(horizontal: false, vertical: true)
+            }
+
             Divider().overlay(Color.line)
 
             HStack {
                 Toggle("Open at login", isOn: Binding(get: { m.opensAtLogin }, set: { m.opensAtLogin = $0 }))
                     .toggleStyle(.checkbox)
                 Spacer()
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
                 Button("Quit") { NSApp.terminate(nil) }.buttonStyle(.plain)
             }.font(.system(size: 12)).foregroundColor(.ink2)
         }
