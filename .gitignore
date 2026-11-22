@@ -6,3 +6,5 @@ dist/
 design/bed*/*.png
 design/bed*/*.json
 design/exports/
+Lowbeam.app/
+Dimmer.app/
