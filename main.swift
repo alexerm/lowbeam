@@ -79,6 +79,11 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         checkConflict()
         // Open at login is on by default; one path only (SMAppService), so the checkbox tells the truth.
         if d.object(forKey: "loginSet") == nil { d.set(true, forKey: "loginSet"); try? SMAppService.mainApp.register() }
+        // The app was called Dimmer before; the login item belongs to the old app, so register the renamed one once.
+        if d.object(forKey: "loginRenamed") == nil {
+            d.set(true, forKey: "loginRenamed")
+            if d.bool(forKey: "loginSet") { try? SMAppService.mainApp.register() }
+        }
         apply()
     }
 
@@ -294,7 +299,7 @@ struct Segments<T: Equatable>: View {
 }
 
 /// A pure white card with black text. Gamma dims every pixel, so white is the brightest the screen can show
-/// at the current setting; this is the most visible thing Dimmer can draw.
+/// at the current setting; this is the most visible thing Lowbeam can draw.
 final class DarkHint {
     static let shared = DarkHint()
     private var panel: NSPanel?
@@ -315,7 +320,7 @@ final class DarkHint {
     private func make() -> NSPanel {
         let view = VStack(spacing: 6) {
             Text("Too dark to see?").font(.system(size: 22, weight: .bold))
-            Text("Press ⌃⌥⌘D to turn Dimmer off.").font(.system(size: 18, weight: .semibold))
+            Text("Press ⌃⌥⌘D to turn Lowbeam off.").font(.system(size: 18, weight: .semibold))
             Text("The same keys turn it back on.").font(.system(size: 14))
         }
         .foregroundColor(.black).padding(.horizontal, 28).padding(.vertical, 20)
@@ -383,7 +388,7 @@ struct Popover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Dimmer").fontWeight(.semibold)
+                Text("Lowbeam").fontWeight(.semibold)
                 Spacer()
                 Toggle("", isOn: Binding(get: { m.enabled }, set: { m.enabled = $0; m.userChanged() })).toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
             }
@@ -489,7 +494,7 @@ struct Popover: View {
             }
 
             if let other = m.conflict {
-                Text("\(other) also changes screen colors, so the two reset each other. Quit \(other) while Dimmer is on.")
+                Text("\(other) also changes screen colors, so the two reset each other. Quit \(other) while Lowbeam is on.")
                     .font(.system(size: 12)).foregroundColor(.amber).fixedSize(horizontal: false, vertical: true)
             }
 
@@ -499,7 +504,7 @@ struct Popover: View {
                 Toggle("Open at login", isOn: Binding(get: { m.opensAtLogin }, set: { m.opensAtLogin = $0 }))
                     .toggleStyle(.checkbox)
                 Spacer()
-                Text("⌃⌥⌘D off").help("Turns Dimmer off or on from any app")
+                Text("⌃⌥⌘D off").help("Turns Lowbeam off or on from any app")
                 Button("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")") {
                     (NSApp.delegate as? App)?.updates.checkForUpdates(nil)
                 }.buttonStyle(.plain).help("Check for updates")
@@ -524,7 +529,7 @@ final class App: NSObject, NSApplicationDelegate {
     /// Sparkle reads SUFeedURL from Info.plist: the appcast attached to the latest GitHub release.
     let updates = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
-    /// ⌃⌥⌘D turns Dimmer off or on from anywhere: the way back when the screen is too dark to find the menu.
+    /// ⌃⌥⌘D turns Lowbeam off or on from anywhere: the way back when the screen is too dark to find the menu.
     private func registerHotKey() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
@@ -574,7 +579,7 @@ final class App: NSObject, NSApplicationDelegate {
             return true
         }
         img.isTemplate = true
-        img.accessibilityDescription = "Dimmer"
+        img.accessibilityDescription = "Lowbeam"
         return img
     }
 

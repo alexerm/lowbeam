@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wickdown — a lower night light for your MacBook</title>
-<meta name="description" content="Wickdown takes a MacBook screen below its lowest brightness, keeps text readable, cuts blue light and turns off the keyboard light. Free menu bar app for macOS 13 and later.">
+<title>Lowbeam — low beams for your MacBook screen</title>
+<meta name="description" content="Lowbeam takes a MacBook screen below its lowest brightness, keeps text readable, cuts blue light and turns off the keyboard light. Free menu bar app for macOS 13 and later.">
 <link rel="icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -109,7 +109,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 <body>
 
 <!-- The same transfer functions the app writes to the display. Ordinary dimmers scale the signal (linear);
-     Wickdown scales light, then bends the curve so dark pixels fall faster than bright ones (gamma). -->
+     Lowbeam scales light, then bends the curve so dark pixels fall faster than bright ones (gamma). -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <filter id="plain" color-interpolation-filters="sRGB">
     <feComponentTransfer>
@@ -125,23 +125,23 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <div class="wrap">
   <nav>
-    <a class="brand" href="#"><img src="icon.png" alt="">Wickdown</a>
-    <div class="links"><a href="#compare">How it looks</a><a href="#features">Features</a><a class="gh" href="https://github.com/alexerm/dimmer">GitHub</a></div>
+    <a class="brand" href="#"><img src="icon.png" alt="">Lowbeam</a>
+    <div class="links"><a href="#compare">How it looks</a><a href="#features">Features</a><a class="gh" href="https://github.com/alexerm/lowbeam">GitHub</a></div>
   </nav>
 
   <header class="hero">
     <div class="copy">
-      <h1>Turn the wick down.</h1>
-      <p class="lead">Your MacBook’s lowest brightness is still too bright at night. Wickdown takes the screen lower, keeps text sharp, and turns the keyboard light off.</p>
+      <h1>Low beams for your screen.</h1>
+      <p class="lead">Your MacBook’s lowest brightness is still too bright at night. Lowbeam dips it lower, keeps text sharp, and turns the keyboard light off.</p>
       <div class="cta">
-        <a class="btn" href="https://github.com/alexerm/dimmer/releases/latest/download/Wickdown.zip">
+        <a class="btn" href="https://github.com/alexerm/lowbeam/releases/latest/download/Lowbeam.zip">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M6.5 10 12 15.5 17.5 10M5 20h14"/></svg>
           Download for Mac
         </a>
         <span class="fine">Free · macOS 13 or later · Apple silicon and Intel</span>
       </div>
     </div>
-    <div class="lamp"><img src="popover.png" width="597" height="1097" alt="Wickdown’s menu: presets Day, Reading and Night; sliders for brightness, contrast and colour; a keyboard light switch; and a wind-down that starts on its own."></div>
+    <div class="lamp"><img src="popover.png" width="597" height="1097" alt="Lowbeam’s menu: presets Day, Reading and Night; sliders for brightness, contrast and colour; a keyboard light switch; and a wind-down that starts on its own."></div>
   </header>
 </div>
 
@@ -149,7 +149,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   <div class="wrap">
     <div class="demo-head">
       <h2>Lower, and still readable.</h2>
-      <p>An ordinary dimmer scales every pixel the same way, so grey text sinks into the background first. Wickdown dims by light, the way your eye sees it, and drops dark greys faster than text. Move the sliders.</p>
+      <p>An ordinary dimmer scales every pixel the same way, so grey text sinks into the background first. Lowbeam dims by light, the way your eye sees it, and drops dark greys faster than text. Move the sliders.</p>
     </div>
     <div class="panes">
       <figure class="pane">
@@ -170,7 +170,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
           <div><span class="dim">› cache warm, 0.8 s</span></div>
           <div class="mail"><b>Lena</b> <span>· 23:41</span><br>Saw the draft, comments are in.</div>
         </div>
-        <figcaption><b>Wickdown</b><span>scales light, softens darks</span></figcaption>
+        <figcaption><b>Lowbeam</b><span>scales light, softens darks</span></figcaption>
       </figure>
     </div>
     <div class="controls">
@@ -229,7 +229,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <article class="feature wide">
         <div>
           <h3>Always a way back</h3>
-          <p>Went too dark to see the menu? Press <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>⌘</kbd> <kbd>D</kbd> from any app. When a change makes text hard to read, Wickdown shows that shortcut in the brightest white the screen can still give.</p>
+          <p>Went too dark to see the menu? Press <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>⌘</kbd> <kbd>D</kbd> from any app. When a change makes text hard to read, Lowbeam shows that shortcut in the brightest white the screen can still give.</p>
         </div>
         <svg viewBox="0 0 300 120" aria-hidden="true">
           <rect x="20" y="18" width="260" height="84" rx="16" fill="#fff"/>
@@ -245,7 +245,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   <div class="wrap how">
     <h2>Built into the display, not laid over it.</h2>
     <dl>
-      <div><dt>No overlay</dt><dd>Wickdown changes the display’s colour table, like Night Shift. Colours stay true, clicks reach every app, and screenshots come out at full brightness.</dd></div>
+      <div><dt>No overlay</dt><dd>Lowbeam changes the display’s colour table, like Night Shift. Colours stay true, clicks reach every app, and screenshots come out at full brightness.</dd></div>
       <div><dt>One permission at most</dt><dd>Location is optional and only finds today’s sunset. Without it, the time zone gives a close guess.</dd></div>
       <div><dt>Small and quiet</dt><dd>A native menu bar app. It updates itself and opens at login.</dd></div>
     </dl>
@@ -254,8 +254,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <footer>
   <div class="wrap">
-    <span>Wickdown is free and open source.</span>
-    <span><a href="https://github.com/alexerm/dimmer">Source on GitHub</a> · <a href="https://github.com/alexerm/dimmer/releases">Release notes</a></span>
+    <span>Lowbeam is free and open source.</span>
+    <span><a href="https://github.com/alexerm/lowbeam">Source on GitHub</a> · <a href="https://github.com/alexerm/lowbeam/releases">Release notes</a></span>
   </div>
 </footer>
 
