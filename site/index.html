@@ -146,6 +146,16 @@ kbd { font: 600 14px Inter, sans-serif; padding: 2px 7px; border-radius: 6px; ba
 .forum .side .head { height: 34px; margin: -12px -12px 10px; background: #2f6fde; border-radius: 4px 4px 0 0; }
 .forum .side p { font-size: 13px; color: #444; }
 .forum .side .join { margin-top: 12px; height: 30px; border-radius: 15px; background: #2f6fde; }
+.forum.dark { background: #0e1726; color: #d7dde8; }
+.forum.dark .bar, .forum.dark .post, .forum.dark .side { background: #16223a; border-color: #24324d; }
+.forum.dark .search { background: #0e1726; border-color: #24324d; }
+.forum.dark .votes { color: #d7dde8; }
+.forum.dark .meta { color: #8592a8; }
+.forum.dark .side p { color: #aab4c5; }
+.forum.dark .thumb { background: linear-gradient(135deg, #2a4470, #1b2b47); }
+.pagepick { display: flex; gap: 6px; font-size: 13px; color: var(--ink2); align-items: center; }
+.pagepick button { height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid #34343a; background: #26262a; color: var(--ink2); font: 500 13px Inter, sans-serif; cursor: pointer; }
+.pagepick button[aria-pressed="true"] { border-color: var(--amber); color: var(--ink); }
 .menu { background: #1f1f23; border: 1px solid #34343a; border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
 .menu .top { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .chips { display: flex; gap: 6px; }
@@ -236,7 +246,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <section class="try" id="try">
   <div class="wrap">
-    <h2>Try it on a bright page.</h2>
+    <h2>Try it on a real page.</h2>
     <p class="sub">The screen runs through the same curve the app sends to your display. Pick a preset, move a slider, or wind down from Day to Night.</p>
     <div class="laptop"><div class="glass">
       <div class="forum" aria-hidden="true">
@@ -245,7 +255,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       </div>
     </div></div>
     <div class="menu">
-      <div class="top">Lowbeam</div>
+      <div class="top">Lowbeam<div class="pagepick" role="group" aria-label="Page"><button data-t="light" aria-pressed="true">Light page</button><button data-t="dark" aria-pressed="false">Dark page</button></div></div>
       <div class="chips" role="group" aria-label="Presets"><button data-p="0">Day</button><button data-p="1">Reading</button><button data-p="2">Night</button></div>
       <div class="slider" id="tLevel" role="slider" tabindex="0" aria-label="Brightness" aria-valuemin="5" aria-valuemax="100"><div class="fill"></div><div class="row"><span>Brightness</span><b></b></div></div>
       <div class="slider" id="tGamma" role="slider" tabindex="0" aria-label="Contrast" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="row"><span>Contrast</span><b></b></div></div>
@@ -459,6 +469,10 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     };
     anim = requestAnimationFrame(step);
   });
+  document.querySelectorAll('.pagepick button').forEach(b => b.addEventListener('click', () => {
+    document.querySelector('.forum').classList.toggle('dark', b.dataset.t === 'dark');
+    document.querySelectorAll('.pagepick button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
   render();
 })();
 </script>
