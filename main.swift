@@ -12,7 +12,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var enabled: Bool { didSet { d.set(enabled, forKey: "enabled"); apply() } }
     @Published var level: Double { didSet { d.set(level, forKey: "level"); apply() } }      // share of light, 0.05...1
     @Published var gamma: Double { didSet { d.set(gamma, forKey: "gamma"); apply() } }      // 1...2.5
-    @Published var floor: Double { didSet { d.set(floor, forKey: "floor"); if level < floor { level = floor } } }
+    @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider }
     @Published var minutes: Int { didSet { d.set(minutes, forKey: "minutes") } }
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
     @Published var startMinute: Int { didSet { d.set(startMinute, forKey: "startMinute") } } // minutes after midnight
@@ -207,14 +207,9 @@ struct Popover: View {
                 // The track runs from the 5% minimum to 100%; the limit only stops the drag.
                 CapsuleSlider(icon: "sun.min", name: "Brightness", value: pct(m.level), fraction: Binding(
                     get: { (m.level - 0.05) / 0.95 },
-                    set: { m.stopEase(); m.level = max(0.05 + $0 * 0.95, m.floor) }))
+                    set: { m.stopEase(); m.level = 0.05 + $0 * 0.95 }))
                 HStack {
-                    if m.floor > 0.051 {
-                        Text("Lowest limit: \(pct(m.floor))").foregroundColor(.ink2)
-                        Button("Remove") { m.floor = 0.05 }.buttonStyle(.plain).foregroundColor(.amber)
-                    } else {
-                        Text("No lowest limit").foregroundColor(.ink2)
-                    }
+                    Text("Wind-down target: \(pct(m.floor))").foregroundColor(.ink2)
                     Spacer()
                     Button("Set to current") { m.floor = m.level }.buttonStyle(.plain).foregroundColor(.amber)
                 }.font(.system(size: 12)).padding(.horizontal, 4)
