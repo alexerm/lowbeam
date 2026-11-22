@@ -2,7 +2,7 @@
 <h1 align="center">Lowbeam</h1>
 <p align="center">Low beams for your MacBook screen.<br>
 Takes the screen below its lowest brightness, keeps text readable, cuts blue light and turns the keyboard light off.</p>
-<p align="center"><a href="https://github.com/alexerm/lowbeam/releases/latest/download/Lowbeam.zip"><b>Download for Mac</b></a> · free · macOS 13 or later · Apple silicon and Intel</p>
+<p align="center"><a href="https://github.com/alexerm/lowbeam/releases/latest/download/Lowbeam.dmg"><b>Download for Mac</b></a> · free · macOS 13 or later · Apple silicon and Intel</p>
 
 <p align="center"><img src="site/popover.png" width="300" alt="The Lowbeam menu: presets, brightness, contrast, colour, keyboard light and wind-down."></p>
 
