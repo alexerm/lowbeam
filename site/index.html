@@ -111,6 +111,18 @@ kbd { font: 600 14px Inter, sans-serif; padding: 2px 7px; border-radius: 6px; ba
 .stack .eye { background: transparent; border: 0; text-align: center; padding: 4px; color: var(--ink2); font-size: 15px; }
 @media (max-width: 860px) { .layers-sec .wrap { grid-template-columns: 1fr; gap: 32px; } }
 
+/* Bedroom pair: the problem and the fix, faded into the page on every side */
+.bed .wrap > h2 { max-width: 20ch; }
+.bed-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 40px; }
+.bed-pair figure { margin: 0; min-width: 0; }
+.bed-pair img { display: block; width: 100%; height: auto;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+          mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent); }
+.bed-pair figcaption { margin-top: 12px; color: var(--ink2); font-size: 15px; }
+.bed-pair figcaption b { color: var(--ink); font-weight: 600; }
+@media (max-width: 860px) { .bed-pair { grid-template-columns: 1fr; } }
+
 /* Closing art: carved night road, faded into the page on every side, no frame */
 .road { padding: 0; }
 .road img {
@@ -174,6 +186,16 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <div class="lamp"><img src="popover.png" width="597" height="1097" alt="Lowbeam’s menu: presets Day, Reading and Night; sliders for brightness, contrast and colour; a keyboard light switch; and a wind-down that starts on its own."></div>
   </header>
 </div>
+
+<section class="bed">
+  <div class="wrap">
+    <h2>At night, one laptop lights the whole flat.</h2>
+    <div class="bed-pair">
+      <figure><img src="bed-blast.webp" width="1200" height="805" alt="A person in bed at night, face lit cold white by a laptop; the glare spills through the bedroom door across the hallway floor." loading="lazy"><figcaption><b>Full brightness.</b> The glare reaches the hallway and keeps everyone awake.</figcaption></figure>
+      <figure><img src="bed-lowbeam.webp" width="1200" height="805" alt="The same scene with Lowbeam: a soft amber glow on the person's face, and the hallway stays dark." loading="lazy"><figcaption><b>With Lowbeam.</b> A soft, warm glow that stays at arm’s length.</figcaption></figure>
+    </div>
+  </div>
+</section>
 
 <section id="compare">
   <div class="wrap">

@@ -3,3 +3,6 @@ icon/Dimmer.iconset/
 .DS_Store
 .build/
 dist/
+design/bed*/*.png
+design/bed*/*.json
+design/exports/
