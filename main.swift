@@ -12,6 +12,8 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var enabled: Bool { didSet { d.set(enabled, forKey: "enabled"); apply() } }
     @Published var level: Double { didSet { d.set(level, forKey: "level"); apply() } }      // share of light, 0.05...1
     @Published var gamma: Double { didSet { d.set(gamma, forKey: "gamma"); apply() } }      // 1...2.5
+    @Published var warmth: Double { didSet { d.set(warmth, forKey: "warmth"); apply() } }   // 0 neutral ... 1 = 2700 K
+    @Published var warmthTarget: Double { didSet { d.set(warmthTarget, forKey: "warmthTarget") } }
     @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider
     @Published var minutes: Int { didSet { d.set(minutes, forKey: "minutes") } }
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
@@ -29,6 +31,8 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         enabled = d.object(forKey: "enabled") as? Bool ?? true
         level = d.object(forKey: "level") as? Double ?? 1
         gamma = d.object(forKey: "gamma") as? Double ?? 1
+        warmth = d.object(forKey: "warmth") as? Double ?? 0
+        warmthTarget = d.object(forKey: "warmthTarget") as? Double ?? 0.6
         floor = d.object(forKey: "floor") as? Double ?? 0.05
         minutes = d.object(forKey: "minutes") as? Int ?? 30
         auto = AutoStart(rawValue: d.string(forKey: "auto") ?? "") ?? .off
@@ -49,12 +53,14 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     @objc func apply() {
-        if !enabled || (level >= 0.999 && gamma <= 1.001) { CGDisplayRestoreColorSyncSettings(); return }
+        if !enabled || (level >= 0.999 && gamma <= 1.001 && warmth <= 0.001) { CGDisplayRestoreColorSyncSettings(); return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16); var n: UInt32 = 0
         CGGetOnlineDisplayList(16, &ids, &n)
         // Exponent > 1 dims darks faster than brights.
         let m = CGGammaValue(Core.gammaMax(level: level)), g = CGGammaValue(gamma)
-        for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, m, g, 0, m, g, 0, m, g) }
+        let c = Core.channelGains(kelvin: Core.kelvin(warmth: warmth))
+        let r = m * CGGammaValue(c.r), gr = m * CGGammaValue(c.g), b = m * CGGammaValue(c.b)
+        for id in ids.prefix(Int(n)) { CGSetDisplayTransferByFormula(id, 0, r, g, 0, gr, g, 0, b, g) }
     }
 
     // MARK: Wind down
@@ -63,8 +69,9 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func startEase() {
         stopEase()
-        let start = level, end = floor, total = Double(minutes * 60)
-        guard start > end + 0.001 else { return }
+        let start = level, end = min(floor, level), total = Double(minutes * 60)
+        let w0 = warmth, w1 = max(warmthTarget, warmth)
+        guard start > end + 0.001 || w1 > w0 + 0.001 else { return }
         enabled = true
         let began = Date()
         easeEnd = began.addingTimeInterval(total)
@@ -73,6 +80,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
             let p = min(Date().timeIntervalSince(began) / total, 1)
             self.easeProgress = p
             self.level = Core.easeLevel(start: start, end: end, progress: p)
+            self.warmth = w0 + (w1 - w0) * p
             if p >= 1 { self.stopEase() }
         }
     }
@@ -202,12 +210,17 @@ struct Popover: View {
             CapsuleSlider(icon: "circle.lefthalf.filled", name: "Contrast", value: contrastWord, fraction: Binding(
                 get: { (m.gamma - 1) / 1.5 }, set: { m.gamma = 1 + $0 * 1.5 }))
 
+            CapsuleSlider(icon: "flame", name: "Warmth", value: "\(Int(Core.kelvin(warmth: m.warmth).rounded())) K", fraction: Binding(
+                get: { m.warmth }, set: { m.stopEase(); m.warmth = $0 }))
+
             Divider().overlay(Color.line)
 
             VStack(alignment: .leading, spacing: 10) {
                 CapsuleSlider(icon: "moon", name: "Wind down to", value: pct(m.floor), fraction: Binding(
                     get: { (m.floor - 0.05) / 0.95 },
                     set: { m.floor = 0.05 + $0 * 0.95 }))
+                CapsuleSlider(icon: "flame", name: "Warm up to", value: "\(Int(Core.kelvin(warmth: m.warmthTarget).rounded())) K", fraction: Binding(
+                    get: { m.warmthTarget }, set: { m.warmthTarget = $0 }))
                 HStack(spacing: 6) {
                     ForEach([(10, "10 min"), (30, "30 min"), (60, "1 hour")], id: \.0) { mins, label in
                         let on = m.minutes == mins

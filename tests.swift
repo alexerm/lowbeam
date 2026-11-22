@@ -49,5 +49,11 @@ check(near(guess.lon, 15), "time zone gives longitude")
 check(Core.conflictingApp(runningBundleIDs: ["com.apple.finder", "org.herf.Flux"]) == "f.lux", "finds f.lux")
 check(Core.conflictingApp(runningBundleIDs: ["com.apple.finder"]) == nil, "no false conflict")
 
+// Warmth: neutral at 0, warm at 1 (red stays, blue drops most).
+let neutral = Core.channelGains(kelvin: Core.kelvin(warmth: 0))
+check(near(neutral.r, 1, 1e-6) && near(neutral.g, 1, 1e-6) && near(neutral.b, 1, 1e-6), "no warmth leaves colours alone")
+let warm = Core.channelGains(kelvin: Core.kelvin(warmth: 1))
+check(near(warm.r, 1, 1e-6) && warm.b < warm.g && warm.g < 1 && warm.b > 0.3, "full warmth: blue < green < red, blue not black")
+
 print(failures == 0 ? "all checks passed" : "\(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

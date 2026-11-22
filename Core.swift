@@ -58,3 +58,21 @@ enum Core {
         runningBundleIDs.lazy.compactMap { gammaApps[$0] }.first
     }
 }
+
+extension Core {
+    /// Warmth 0...1 maps 6500 K (neutral) to 2700 K (candle-like).
+    static func kelvin(warmth w: Double) -> Double { 6500 - 3800 * min(max(w, 0), 1) }
+
+    /// Channel gains for a colour temperature, relative to 6500 K (Tanner Helland's fit of the blackbody curve).
+    static func channelGains(kelvin k: Double) -> (r: Double, g: Double, b: Double) {
+        func raw(_ k: Double) -> (Double, Double, Double) {
+            let t = k / 100
+            let r = t <= 66 ? 255 : 329.698727446 * pow(t - 60, -0.1332047592)
+            let g = t <= 66 ? 99.4708025861 * log(t) - 161.1195681661 : 288.1221695283 * pow(t - 60, -0.0755148492)
+            let b = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307)
+            return (min(max(r, 0), 255), min(max(g, 0), 255), min(max(b, 0), 255))
+        }
+        let n = raw(6500), c = raw(k)
+        return (min(c.0 / n.0, 1), min(c.1 / n.1, 1), min(c.2 / n.2, 1))
+    }
+}
