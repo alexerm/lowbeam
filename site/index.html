@@ -123,6 +123,40 @@ kbd { font: 600 14px Inter, sans-serif; padding: 2px 7px; border-radius: 6px; ba
 .bed-pair figcaption b { color: var(--ink); font-weight: 600; }
 @media (max-width: 860px) { .bed-pair { grid-template-columns: 1fr; } }
 
+/* Live demo: a bright forum page on a laptop screen, run through the app's curve */
+.try .wrap { display: grid; grid-template-columns: 1fr 300px; gap: 40px; align-items: center; }
+.try .wrap > * { min-width: 0; }
+.try h2 { grid-column: 1 / -1; }
+.try .sub { grid-column: 1 / -1; color: var(--ink2); max-width: 52ch; margin-top: -24px; }
+.laptop { background: #0b0b0d; border: 1px solid #2a2a2f; border-radius: 18px; padding: 14px; box-shadow: 0 40px 80px -30px #000; }
+.laptop .glass { border-radius: 8px; overflow: hidden; height: 420px; position: relative; }
+.forum { filter: url(#live); background: #dae0e6; height: 100%; font: 14px/1.4 Inter, system-ui, sans-serif; color: #1c1c1c; overflow: hidden; }
+.forum .bar { display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 16px; background: #fff; border-bottom: 1px solid #edeff1; }
+.forum .logo { width: 26px; height: 26px; border-radius: 50%; background: #2f6fde; }
+.forum .bar b { font-size: 16px; }
+.forum .search { flex: 1; max-width: 380px; height: 30px; border-radius: 15px; background: #f6f7f8; border: 1px solid #edeff1; margin-left: 12px; }
+.forum .feed { display: grid; grid-template-columns: 1fr 200px; gap: 16px; padding: 16px; }
+.forum .post { display: flex; gap: 10px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 10px 12px; margin-bottom: 10px; }
+.forum .votes { width: 28px; text-align: center; font-weight: 700; font-size: 12px; color: #1a1a1b; }
+.forum .votes i { display: block; width: 0; height: 0; margin: 2px auto; border: 6px solid transparent; border-bottom-color: #878a8c; }
+.forum .meta { font-size: 12px; color: #787c7e; }
+.forum .title { font-size: 16px; font-weight: 600; margin: 2px 0 6px; }
+.forum .thumb { height: 70px; border-radius: 4px; background: linear-gradient(135deg, #c9d6e8, #eef2f7); }
+.forum .side { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 12px; height: max-content; }
+.forum .side .head { height: 34px; margin: -12px -12px 10px; background: #2f6fde; border-radius: 4px 4px 0 0; }
+.forum .side p { font-size: 13px; color: #444; }
+.forum .side .join { margin-top: 12px; height: 30px; border-radius: 15px; background: #2f6fde; }
+.menu { background: #1f1f23; border: 1px solid #34343a; border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.menu .top { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.chips { display: flex; gap: 6px; }
+.chips button { flex: 1; height: 34px; border-radius: 17px; border: 1px solid #34343a; background: #26262a; color: var(--ink2); font: 500 14px Inter, sans-serif; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--amberDim); border-color: var(--amber); color: var(--ink); }
+.chips button:focus-visible, .wind:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.wind { height: 38px; border-radius: 10px; border: 1px solid #34343a; background: #26262a; color: var(--ink); font: 500 14px Inter, sans-serif; cursor: pointer; position: relative; overflow: hidden; }
+.wind span { position: relative; }
+.wind .prog { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--amberDim); }
+@media (max-width: 860px) { .try .wrap { grid-template-columns: 1fr; } .laptop .glass { height: 340px; } .forum .feed { grid-template-columns: 1fr; } .forum .side { display: none; } }
+
 /* Closing art: carved night road, faded into the page on every side, no frame */
 .road { padding: 0; }
 .road img {
@@ -163,6 +197,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <feFuncR id="wR" type="gamma" amplitude="1" exponent="1"/><feFuncG id="wG" type="gamma" amplitude="1" exponent="1"/><feFuncB id="wB" type="gamma" amplitude="1" exponent="1"/>
     </feComponentTransfer>
   </filter>
+  <filter id="live" color-interpolation-filters="sRGB"><feComponentTransfer>
+    <feFuncR id="lR" type="gamma" amplitude="1" exponent="1" offset="0"/><feFuncG id="lG" type="gamma" amplitude="1" exponent="1" offset="0"/><feFuncB id="lB" type="gamma" amplitude="1" exponent="1" offset="0"/>
+  </feComponentTransfer></filter>
 </svg>
 
 <div class="wrap">
@@ -193,6 +230,27 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <div class="bed-pair">
       <figure><img src="bed-blast.webp" width="1200" height="805" alt="A person in bed at night, face lit cold white by a laptop; the glare spills through the bedroom door across the hallway floor." loading="lazy"><figcaption><b>Full brightness.</b> The glare reaches the hallway and keeps everyone awake.</figcaption></figure>
       <figure><img src="bed-lowbeam.webp" width="1200" height="805" alt="The same scene with Lowbeam: a soft amber glow on the person's face, and the hallway stays dark." loading="lazy"><figcaption><b>With Lowbeam.</b> A soft, warm glow that stays at arm’s length.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="try" id="try">
+  <div class="wrap">
+    <h2>Try it on a bright page.</h2>
+    <p class="sub">The screen runs through the same curve the app sends to your display. Pick a preset, move a slider, or wind down from Day to Night.</p>
+    <div class="laptop"><div class="glass">
+      <div class="forum" aria-hidden="true">
+        <div class="bar"><div class="logo"></div><b>Northwind Forum</b><div class="search"></div></div>
+        <div class="feed"><div><div class="post"><div class="votes"><i></i>1.2k</div><div><div class="meta"><b>c/macsetup</b> · posted by Northwind_Dev · 4h</div><div class="title">What's your night-time screen setup? Mine still feels like a floodlight at 1 a.m.</div><div class="thumb"></div></div></div><div class="post"><div class="votes"><i></i>864</div><div><div class="meta"><b>c/sleep</b> · posted by litware_lena · 7h</div><div class="title">Tried reading in bed with the brightness at minimum. Still too bright.</div><div class="thumb"></div></div></div><div class="post"><div class="votes"><i></i>512</div><div><div class="meta"><b>c/productivity</b> · posted by contoso_kai · 9h</div><div class="title">Dark mode helps until a site opens on a white page</div><div class="thumb"></div></div></div></div><div class="side"><div class="head"></div><b>c/macsetup</b><p>Desks, displays and the apps that make them nicer to sit at.</p><div class="join"></div></div></div>
+      </div>
+    </div></div>
+    <div class="menu">
+      <div class="top">Lowbeam</div>
+      <div class="chips" role="group" aria-label="Presets"><button data-p="0">Day</button><button data-p="1">Reading</button><button data-p="2">Night</button></div>
+      <div class="slider" id="tLevel" role="slider" tabindex="0" aria-label="Brightness" aria-valuemin="5" aria-valuemax="100"><div class="fill"></div><div class="row"><span>Brightness</span><b></b></div></div>
+      <div class="slider" id="tGamma" role="slider" tabindex="0" aria-label="Contrast" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="row"><span>Contrast</span><b></b></div></div>
+      <div class="slider" id="tBlue" role="slider" tabindex="0" aria-label="Less blue" aria-valuemin="0" aria-valuemax="75"><div class="fill"></div><div class="row"><span>Less blue</span><b></b></div></div>
+      <button class="wind" id="tWind"><div class="prog"></div><span>Wind down to Night</span></button>
     </div>
   </div>
 </section>
@@ -361,6 +419,46 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   }
   bind('sLevel', f => state.level = 0.05 + f * 0.95);
   bind('sGamma', f => state.contrast = f);
+  render();
+})();
+// Live demo: presets, sliders and wind-down, with the app's values and per-channel formula.
+(function () {
+  const P = [{ level: 1, gamma: 1, blue: 0 }, { level: 0.75, gamma: 1.3, blue: 0.5 }, { level: 0.5, gamma: 1.6, blue: 0.75 }];
+  let s = { ...P[0] }, anim = null;
+  const word = g => g < 1.05 ? 'Normal' : g < 1.5 ? 'Soft' : g < 2 ? 'Crisp' : 'Strong';
+  const near = (a, b) => Math.abs(a.level - b.level) < 0.02 && Math.abs(a.gamma - b.gamma) < 0.05 && Math.abs(a.blue - b.blue) < 0.02;
+  function render() {
+    const m = Math.pow(s.level, 1 / 2.2);
+    [['lR', 1], ['lG', 1], ['lB', 1 - s.blue]].forEach(([id, gain]) => { const f = document.getElementById(id); f.setAttribute('amplitude', (m * gain).toFixed(3)); f.setAttribute('exponent', s.gamma.toFixed(3)); });
+    put('tLevel', (s.level - 0.05) / 0.95, Math.round(s.level * 100) + '%');
+    put('tGamma', (s.gamma - 1) / 1.5, word(s.gamma));
+    put('tBlue', s.blue / 0.75, s.blue < 0.01 ? 'Off' : '−' + Math.round(s.blue * 100) + '%');
+    document.querySelectorAll('.chips button').forEach(b => b.setAttribute('aria-pressed', near(s, P[+b.dataset.p])));
+  }
+  function put(id, frac, label) { const el = document.getElementById(id); el.querySelector('.fill').style.width = Math.min(Math.max(frac, 0), 1) * 100 + '%'; el.querySelector('b').textContent = label; el.setAttribute('aria-valuetext', label); }
+  function stop() { if (anim) { cancelAnimationFrame(anim); anim = null; } document.querySelector('#tWind .prog').style.width = 0; }
+  function slide(id, get, apply) {
+    const el = document.getElementById(id);
+    const move = e => { const r = el.getBoundingClientRect(); stop(); apply(Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1)); render(); };
+    el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); move(e); });
+    el.addEventListener('pointermove', e => { if (el.hasPointerCapture(e.pointerId)) move(e); });
+    el.addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key]; if (!d) return; e.preventDefault(); stop(); apply(Math.min(Math.max(get() + d * 0.05, 0), 1)); render(); });
+  }
+  slide('tLevel', () => (s.level - 0.05) / 0.95, f => s.level = 0.05 + f * 0.95);
+  slide('tGamma', () => (s.gamma - 1) / 1.5, f => s.gamma = 1 + f * 1.5);
+  slide('tBlue', () => s.blue / 0.75, f => s.blue = Math.round(f * 3) * 0.25);
+  document.querySelectorAll('.chips button').forEach(b => b.addEventListener('click', () => { stop(); s = { ...P[+b.dataset.p] }; render(); }));
+  document.getElementById('tWind').addEventListener('click', () => {
+    stop(); const from = { ...s }, to = P[2], t0 = performance.now(), dur = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 8000;
+    const prog = document.querySelector('#tWind .prog');
+    const step = now => {
+      const p = Math.min((now - t0) / dur, 1);
+      s = { level: from.level * Math.pow(to.level / from.level, p), gamma: from.gamma + (to.gamma - from.gamma) * p, blue: from.blue + (to.blue - from.blue) * p };
+      prog.style.width = p * 100 + '%'; render();
+      anim = p < 1 ? requestAnimationFrame(step) : (prog.style.width = 0, null);
+    };
+    anim = requestAnimationFrame(step);
+  });
   render();
 })();
 </script>
