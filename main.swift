@@ -12,7 +12,7 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var enabled: Bool { didSet { d.set(enabled, forKey: "enabled"); apply() } }
     @Published var level: Double { didSet { d.set(level, forKey: "level"); apply() } }      // share of light, 0.05...1
     @Published var gamma: Double { didSet { d.set(gamma, forKey: "gamma"); apply() } }      // 1...2.5
-    @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider }
+    @Published var floor: Double { didSet { d.set(floor, forKey: "floor") } }   // wind-down target; never limits the slider
     @Published var minutes: Int { didSet { d.set(minutes, forKey: "minutes") } }
     @Published var auto: AutoStart { didSet { d.set(auto.rawValue, forKey: "auto"); if auto == .sunset { locate() } } }
     @Published var startMinute: Int { didSet { d.set(startMinute, forKey: "startMinute") } } // minutes after midnight
