@@ -203,17 +203,9 @@ struct Popover: View {
                 Toggle("", isOn: $m.enabled).toggleStyle(.switch).tint(.amber).labelsHidden().controlSize(.small)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                // The track runs from the 5% minimum to 100%; the limit only stops the drag.
-                CapsuleSlider(icon: "sun.min", name: "Brightness", value: pct(m.level), fraction: Binding(
-                    get: { (m.level - 0.05) / 0.95 },
-                    set: { m.stopEase(); m.level = 0.05 + $0 * 0.95 }))
-                HStack {
-                    Text("Wind-down target: \(pct(m.floor))").foregroundColor(.ink2)
-                    Spacer()
-                    Button("Set to current") { m.floor = m.level }.buttonStyle(.plain).foregroundColor(.amber)
-                }.font(.system(size: 12)).padding(.horizontal, 4)
-            }
+            CapsuleSlider(icon: "sun.min", name: "Brightness", value: pct(m.level), fraction: Binding(
+                get: { (m.level - 0.05) / 0.95 },
+                set: { m.stopEase(); m.level = 0.05 + $0 * 0.95 }))
 
             CapsuleSlider(icon: "circle.lefthalf.filled", name: "Contrast", value: contrastWord, fraction: Binding(
                 get: { (m.gamma - 1) / 1.5 }, set: { m.gamma = 1 + $0 * 1.5 }))
@@ -221,10 +213,9 @@ struct Popover: View {
             Divider().overlay(Color.line)
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "moon").foregroundColor(.ink2)
-                    Text("Wind down to \(pct(m.floor))")
-                }
+                CapsuleSlider(icon: "moon", name: "Wind down to", value: pct(m.floor), fraction: Binding(
+                    get: { (m.floor - 0.05) / 0.95 },
+                    set: { m.floor = 0.05 + $0 * 0.95 }))
                 HStack(spacing: 6) {
                     ForEach([(10, "10 min"), (30, "30 min"), (60, "1 hour")], id: \.0) { mins, label in
                         let on = m.minutes == mins
