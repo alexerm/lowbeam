@@ -90,6 +90,14 @@ kbd { font: 600 14px Inter, sans-serif; padding: 2px 7px; border-radius: 6px; ba
 .how dt { font-weight: 600; }
 .how dd { color: var(--ink2); }
 
+/* Closing art: carved night road, faded into the page on every side, no frame */
+.road { padding: 0; }
+.road img {
+  display: block; width: 100%; height: clamp(300px, 46vw, 660px); object-fit: cover; object-position: 50% 55%;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  mask-composite: intersect;
+}
 footer { padding: 56px 0 72px; border-top: 1px solid #222226; color: var(--ink2); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
 
@@ -250,6 +258,10 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <div><dt>Small and quiet</dt><dd>A native menu bar app. It updates itself and opens at login.</dd></div>
     </dl>
   </div>
+</section>
+
+<section class="road" aria-hidden="true">
+  <img src="road-1456.webp" srcset="road-800.webp 800w, road-1456.webp 1456w" sizes="100vw" width="1456" height="950" alt="" loading="lazy">
 </section>
 
 <footer>
