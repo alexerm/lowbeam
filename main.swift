@@ -209,7 +209,12 @@ struct Popover: View {
                     get: { (m.level - 0.05) / 0.95 },
                     set: { m.stopEase(); m.level = max(0.05 + $0 * 0.95, m.floor) }))
                 HStack {
-                    Text("Lowest limit: \(pct(m.floor))").foregroundColor(.ink2)
+                    if m.floor > 0.051 {
+                        Text("Lowest limit: \(pct(m.floor))").foregroundColor(.ink2)
+                        Button("Remove") { m.floor = 0.05 }.buttonStyle(.plain).foregroundColor(.amber)
+                    } else {
+                        Text("No lowest limit").foregroundColor(.ink2)
+                    }
                     Spacer()
                     Button("Set to current") { m.floor = m.level }.buttonStyle(.plain).foregroundColor(.amber)
                 }.font(.system(size: 12)).padding(.horizontal, 4)
