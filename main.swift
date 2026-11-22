@@ -2,6 +2,7 @@ import Cocoa
 import SwiftUI
 import CoreLocation
 import ServiceManagement
+import Carbon.HIToolbox
 
 // MARK: - Model
 
@@ -57,14 +58,14 @@ final class Dimmer: NSObject, ObservableObject, CLLocationManagerDelegate {
         blueCut = d.object(forKey: "blueCut") as? Double ?? 0
         style = ColourStyle(rawValue: d.string(forKey: "style") ?? "") ?? .blue
         let saved = (d.data(forKey: "presets")).flatMap { try? JSONDecoder().decode([Preset].self, from: $0) }
-        presets = saved ?? Preset.defaults
+        presets = saved.map(Preset.migrate) ?? Preset.defaults
         windTarget = d.string(forKey: "windTarget") ?? (saved ?? Preset.defaults).last!.id
         minutes = d.object(forKey: "minutes") as? Int ?? 30
         auto = AutoStart(rawValue: d.string(forKey: "auto") ?? "") ?? .off
         autoKind = AutoStart(rawValue: d.string(forKey: "autoKind") ?? "") ?? .sunset
         startMinute = d.object(forKey: "startMinute") as? Int ?? 22 * 60
         super.init()
-        if saved == nil { presets = Preset.defaults; windTarget = presets.last!.id }
+        if saved == nil { presets = Preset.defaults; windTarget = presets.last!.id } else { presets = presets }   // store migrated looks
         if auto != .off { autoKind = auto }
         loc.delegate = self
         updateSunset()
@@ -443,6 +444,7 @@ struct Popover: View {
                 Toggle("Open at login", isOn: Binding(get: { m.opensAtLogin }, set: { m.opensAtLogin = $0 }))
                     .toggleStyle(.checkbox)
                 Spacer()
+                Text("⌃⌥⌘D off").help("Turns Dimmer off or on from any app")
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
                 Button("Quit") { NSApp.terminate(nil) }.buttonStyle(.plain)
             }.font(.system(size: 12)).foregroundColor(.ink2)
@@ -463,7 +465,21 @@ final class App: NSObject, NSApplicationDelegate {
     let popover = NSPopover()
     let model = Dimmer()
 
+    /// ⌃⌥⌘D turns Dimmer off or on from anywhere: the way back when the screen is too dark to find the menu.
+    private func registerHotKey() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
+            let me = Unmanaged<App>.fromOpaque(ctx!).takeUnretainedValue()
+            DispatchQueue.main.async { me.model.stopEase(); me.model.enabled.toggle() }
+            return noErr
+        }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
+        var ref: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(controlKey | optionKey | cmdKey),
+                            EventHotKeyID(signature: OSType(0x444D4D52), id: 1), GetApplicationEventTarget(), 0, &ref)
+    }
+
     func applicationDidFinishLaunching(_ n: Notification) {
+        registerHotKey()
         item.button?.image = Self.menuIcon()
         item.button?.action = #selector(toggle)
         item.button?.target = self

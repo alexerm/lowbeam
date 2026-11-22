@@ -102,9 +102,20 @@ struct Preset: Codable, Identifiable, Equatable {
 
     static let defaults = [
         Preset(name: "Day", look: Look(level: 1, gamma: 1, warmth: 0, blueCut: 0), keyboard: true),
-        Preset(name: "Reading", look: Look(level: 0.45, gamma: 1.3, warmth: 0, blueCut: 0.5), keyboard: true),
-        Preset(name: "Night", look: Look(level: 0.12, gamma: 1.8, warmth: 0, blueCut: 0.75), keyboard: false),
+        Preset(name: "Reading", look: Look(level: 0.75, gamma: 1.3, warmth: 0, blueCut: 0.5), keyboard: true),
+        Preset(name: "Night", look: Look(level: 0.5, gamma: 1.6, warmth: 0, blueCut: 0.75), keyboard: false),
     ]
+
+    /// Looks shipped in 1.2.0 that made the screen too dark; a saved preset still on one moves to the new default.
+    static let retired = ["Reading": Look(level: 0.45, gamma: 1.3, warmth: 0, blueCut: 0.5),
+                          "Night": Look(level: 0.12, gamma: 1.8, warmth: 0, blueCut: 0.75)]
+    static func migrate(_ list: [Preset]) -> [Preset] {
+        list.map { p in
+            var p = p
+            if retired[p.name] == p.look, let new = defaults.first(where: { $0.name == p.name }) { p.look = new.look }
+            return p
+        }
+    }
 }
 
 extension Core {

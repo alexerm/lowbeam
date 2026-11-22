@@ -63,5 +63,9 @@ check(Core.blueStep(0) == 0 && Core.blueStep(0.5) == 0.5 && Core.blueStep(1) == 
 let data = try! JSONEncoder().encode(Preset.defaults)
 check(try! JSONDecoder().decode([Preset].self, from: data) == Preset.defaults, "presets round-trip through storage")
 
+let old = [Preset(name: "Night", look: Preset.retired["Night"]!, keyboard: false), Preset(name: "Night", look: Look(level: 0.3, gamma: 1, warmth: 0, blueCut: 0), keyboard: false)]
+let moved = Preset.migrate(old)
+check(moved[0].look == Preset.defaults[2].look && moved[1].look == old[1].look, "too-dark Night moves to the new default; an edited one stays")
+
 print(failures == 0 ? "all checks passed" : "\(failures) checks failed")
 exit(failures == 0 ? 0 : 1)
